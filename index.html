@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>SHADOW WEAVER</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+  html, body {
+    height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none;
+    background: #05030f; color: #e8e4ff;
+    font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none;
+  }
+  #gameCanvas { position: fixed; inset: 0; display: block; touch-action: none; cursor: grab; z-index: 1; }
+  #gameCanvas.dragging { cursor: grabbing; }
+  .hidden { display: none !important; }
+
+  .glass {
+    background: rgba(11, 8, 30, 0.72);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+  }
+  .overlay {
+    position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+    background: rgba(3, 2, 16, 0.55); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    padding: 16px;
+  }
+  .card {
+    max-width: 560px; width: min(560px, 94vw); max-height: 88vh; overflow-y: auto;
+    padding: 28px 26px; border-radius: 22px; text-align: center; animation: fadeUp .32s ease both;
+  }
+  .card::-webkit-scrollbar { width: 6px; }
+  .card::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+  .title-gradient {
+    background: linear-gradient(92deg, #ffd76a 8%, #ff9a3c 42%, #7df9ff 92%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 4px 26px rgba(255, 170, 60, 0.28));
+  }
+  .rose-gradient {
+    background: linear-gradient(92deg, #ff8fa8, #ffd76a);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .cyan-glow { color: #7df9ff; text-shadow: 0 0 22px rgba(125,249,255,0.45); }
+
+  .btn {
+    font-weight: 800; letter-spacing: 0.14em; padding: 13px 28px; border-radius: 13px;
+    font-size: 14px; transition: transform .12s ease, box-shadow .12s ease, background .15s;
+    cursor: pointer; border: none; font-family: inherit;
+  }
+  .btn:active { transform: scale(0.95); }
+  .btn-primary { background: linear-gradient(135deg, #ffd76a, #ff9a3c); color: #1a0f02; box-shadow: 0 6px 26px rgba(255,170,60,0.35); }
+  .btn-primary:hover { box-shadow: 0 10px 34px rgba(255,170,60,0.55); }
+  .btn-ghost { background: rgba(255,255,255,0.06); color: #e8e4ff; border: 1px solid rgba(255,255,255,0.16); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.12); }
+  .btn-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+
+  .deco { display: flex; align-items: center; gap: 12px; margin: 6px 0 16px; }
+  .deco-line { flex: 1; height: 1px; background: linear-gradient(90deg, rgba(255,215,106,0.55), rgba(125,249,255,0.55)); }
+  .deco-sun { width: 18px; height: 18px; border-radius: 50%; flex: 0 0 auto;
+    background: radial-gradient(circle, #fff6d8, #ffd27a 55%, #ff9a3c);
+    box-shadow: 0 0 26px rgba(255,210,122,0.8); animation: pulse 2.6s ease-in-out infinite; }
+  .deco-wisp { width: 15px; height: 21px; flex: 0 0 auto; border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%;
+    background: #0b0722; border: 2px solid #6ef2ff; box-shadow: 0 0 18px rgba(110,231,255,0.65);
+    animation: floatY 2.8s ease-in-out infinite; }
+
+  .key-grid { display: grid; grid-template-columns: auto 1fr; gap: 7px 16px; text-align: left; font-size: 12.5px; margin: 0 auto; width: fit-content; }
+  .key-grid .k { color: #ffd76a; font-weight: 700; white-space: nowrap; }
+  .key-cap { display: inline-block; padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.22);
+    background: rgba(255,255,255,0.07); font-size: 11px; font-weight: 700; margin-right: 4px; }
+
+  .score-table { width: 100%; font-size: 12.5px; border-collapse: separate; border-spacing: 0 3px; }
+  .score-row { display: grid; grid-template-columns: 26px 1fr 52px 64px 76px; gap: 6px; padding: 7px 10px; border-radius: 9px; align-items: center; }
+  .score-row.head { opacity: 0.55; font-weight: 800; letter-spacing: 0.1em; font-size: 10.5px; }
+  .score-row.highlight { background: rgba(255,215,106,0.13); border: 1px solid rgba(255,215,106,0.35); }
+  .score-row .sc { color: #ffd76a; font-weight: 800; }
+  .empty-scores { opacity: 0.55; padding: 14px; font-size: 13px; }
+
+  .stat-row { display: flex; justify-content: space-between; padding: 9px 2px; border-bottom: 1px dashed rgba(255,255,255,0.12); font-size: 14px; }
+  .stat-row .v { color: #ffd76a; font-weight: 800; }
+
+  #hud { position: fixed; top: 0; left: 0; right: 0; z-index: 40; display: flex; justify-content: space-between;
+    align-items: flex-start; padding: calc(10px + env(safe-area-inset-top)) 12px 10px; gap: 8px; pointer-events: none; }
+  #hud .hud-side { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .hud-pill { display: flex; align-items: center; gap: 7px; padding: 7px 13px; border-radius: 999px;
+    font-size: 13px; font-weight: 800; letter-spacing: 0.08em; white-space: nowrap; }
+  .hud-pill .sub { font-weight: 600; opacity: 0.65; font-size: 10.5px; letter-spacing: 0.12em; }
+  .hud-btn { pointer-events: auto; width: 38px; height: 38px; border-radius: 999px; display: flex;
+    align-items: center; justify-content: center; cursor: pointer; transition: transform .1s; }
+  .hud-btn:active { transform: scale(0.9); }
+  .heart { width: 17px; height: 17px; }
+  .heart svg { width: 17px; height: 17px; fill: #ff6b8a; filter: drop-shadow(0 0 6px rgba(255,107,138,0.55)); }
+  .heart.lost svg { fill: rgba(255,255,255,0.13); filter: none; }
+  #dissolveWrap { display: flex; align-items: center; gap: 8px; }
+  #dissolveBar { width: 118px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.13); overflow: hidden; }
+  #dissolveFill { height: 100%; width: 100%; border-radius: 999px; background: linear-gradient(90deg, #7df9ff, #c9f6ff); transition: width .08s linear; }
+  #dissolveFill.danger { background: linear-gradient(90deg, #ff9a3c, #ffd76a); }
+  #weaveWrap { display: flex; align-items: center; gap: 8px; }
+  #weaveBar { width: 84px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.13); overflow: hidden; }
+  #weaveFill { height: 100%; width: 100%; border-radius: 999px; background: linear-gradient(90deg, #b18cff, #7df9ff); transition: width .08s linear; }
+  #weaveFill.low { background: linear-gradient(90deg, #6b5a99, #8a7ab8); }
+  .tc-weave { position: absolute; right: calc(30px + env(safe-area-inset-right)); bottom: calc(122px + env(safe-area-inset-bottom));
+    width: 62px; height: 62px; border-radius: 50%; background: rgba(177,140,255,0.16);
+    border: 1.5px solid rgba(177,140,255,0.6); color: #e0d2ff; font-weight: 900; font-size: 10.5px; letter-spacing: 0.1em;
+    box-shadow: 0 0 20px rgba(177,140,255,0.25); }
+  .tc-weave:active { background: rgba(177,140,255,0.4); transform: scale(0.94); }
+
+  #toast { position: fixed; top: 15%; left: 50%; transform: translateX(-50%); z-index: 45; padding: 11px 24px;
+    border-radius: 999px; font-weight: 800; letter-spacing: 0.2em; font-size: 13.5px; color: #ffd76a;
+    pointer-events: none; white-space: nowrap; animation: toastPop .28s ease; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
+  #hint { position: fixed; bottom: 116px; left: 50%; transform: translateX(-50%); z-index: 35; padding: 11px 20px;
+    border-radius: 15px; text-align: center; font-size: 12.5px; letter-spacing: 0.08em; color: #cfe9ff;
+    pointer-events: none; line-height: 1.85; max-width: 92vw; animation: floatY 3.2s ease-in-out infinite; }
+
+  #touchControls { position: fixed; inset: 0; z-index: 30; pointer-events: none; }
+  #touchControls button { pointer-events: auto; border: none; font-family: inherit; }
+  .tc-left { position: absolute; left: calc(14px + env(safe-area-inset-left)); bottom: calc(16px + env(safe-area-inset-bottom)); display: flex; gap: 12px; }
+  .tc-btn { width: 64px; height: 64px; border-radius: 50%; background: rgba(255,255,255,0.08);
+    border: 1.5px solid rgba(255,255,255,0.22); color: #e8e4ff; display: flex; align-items: center; justify-content: center; }
+  .tc-btn:active, .tc-btn.held { background: rgba(125,249,255,0.25); border-color: rgba(125,249,255,0.6); }
+  .tc-jump { position: absolute; right: calc(18px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom));
+    width: 86px; height: 86px; border-radius: 50%; background: linear-gradient(135deg, #ffd76a, #ff9a3c);
+    color: #1a0f02; font-weight: 900; font-size: 15px; letter-spacing: 0.12em; box-shadow: 0 8px 30px rgba(255,170,60,0.4); }
+  .tc-jump:active { transform: scale(0.94); }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  @keyframes toastPop { from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.9); } to { opacity: 1; transform: translateX(-50%); } }
+  @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.16); } }
+  @keyframes floatY { 0%, 100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-7px); } }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="hud-side">
+    <div class="hud-pill glass"><span class="sub">LV</span><span id="hudLevel">1</span></div>
+    <div class="hud-pill glass"><span class="sub">SCORE</span><span id="hudScore">0</span></div>
+    <div class="hud-pill glass">
+      <svg width="13" height="13" viewBox="0 0 24 24" style="fill:#ffd76a"><path d="M12 2 L21 12 L12 22 L3 12 Z"/></svg>
+      <span id="hudShards">0/0</span>
+    </div>
+  </div>
+  <div class="hud-side">
+    <div class="hud-pill glass" id="hearts"></div>
+    <div class="hud-pill glass" id="dissolveWrap">
+      <span class="sub">SHADOW</span>
+      <div id="dissolveBar"><div id="dissolveFill"></div></div>
+    </div>
+    <div class="hud-pill glass" id="weaveWrap">
+      <span class="sub">WEAVE</span>
+      <div id="weaveBar"><div id="weaveFill"></div></div>
+    </div>
+    <button class="hud-btn glass" id="btnPause" title="Pause (P)">
+      <svg width="15" height="15" viewBox="0 0 24 24" style="fill:#e8e4ff"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+    </button>
+    <button class="hud-btn glass" id="btnMute" title="Mute (M)">
+      <svg id="iconSoundOn" width="17" height="17" viewBox="0 0 24 24" style="fill:#e8e4ff"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
+      <svg id="iconSoundOff" class="hidden" width="17" height="17" viewBox="0 0 24 24" style="fill:#e8e4ff"><path d="M3 9v6h4l5 5V4L7 9H3zm14.6 3 2.7-2.7-1.4-1.4-2.7 2.7-2.7-2.7-1.4 1.4 2.7 2.7-2.7 2.7 1.4 1.4 2.7-2.7 2.7 2.7 1.4-1.4-2.7-2.7z"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- TOUCH CONTROLS -->
+<div id="touchControls" class="hidden">
+  <div class="tc-left">
+    <button class="tc-btn" id="btnLeft" aria-label="Move left">
+      <svg width="22" height="22" viewBox="0 0 24 24" style="fill:#e8e4ff"><path d="M15.5 4.5 8 12l7.5 7.5 1.4-1.4L10.8 12l6.1-6.1z"/></svg>
+    </button>
+    <button class="tc-btn" id="btnRight" aria-label="Move right">
+      <svg width="22" height="22" viewBox="0 0 24 24" style="fill:#e8e4ff"><path d="M8.5 4.5 16 12l-7.5 7.5-1.4-1.4 6.1-6.1-6.1-6.1z"/></svg>
+    </button>
+  </div>
+  <button class="tc-weave" id="btnWeave">FREEZE</button>
+  <button class="tc-jump" id="btnJump">JUMP</button>
+</div>
+
+<!-- TOAST + HINT -->
+<div id="toast" class="glass hidden"></div>
+<div id="hint" class="glass hidden">
+  <div><span class="key-cap">DRAG</span> or <span class="key-cap">Q</span><span class="key-cap">E</span> — aim the light</div>
+  <div><span class="key-cap">SPACE</span> jump · <span class="key-cap">P</span> pause · stay in shadow</div>
+  <div><span class="key-cap">S</span> echo weave — freeze shadows, then recast the light</div>
+</div>
+
+<!-- MENU -->
+<div id="menu" class="overlay">
+  <div class="card glass">
+    <div class="deco"><div class="deco-sun"></div><div class="deco-line"></div><div class="deco-wisp"></div></div>
+    <h1 class="title-gradient text-5xl md:text-6xl font-black tracking-[0.14em] m-0">SHADOW WEAVER</h1>
+    <p class="opacity-80 text-sm md:text-[15px] leading-relaxed mt-3">You are a wisp of shadow. The light dissolves you — but it also weaves your paths. The sun casts shadows of the floating monoliths: walk on their glowing edges, gather every light shard, and reach the gate.</p>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnStart">BEGIN WEAVING</button>
+    </div>
+    <div class="mt-6">
+      <div class="key-grid">
+        <span class="k">MOVE</span><span><span class="key-cap">A</span><span class="key-cap">D</span> or <span class="key-cap">←</span><span class="key-cap">→</span></span>
+        <span class="k">JUMP</span><span><span class="key-cap">W</span><span class="key-cap">↑</span><span class="key-cap">SPACE</span></span>
+        <span class="k">AIM LIGHT</span><span><span class="key-cap">DRAG</span> anywhere or <span class="key-cap">Q</span><span class="key-cap">E</span></span>
+        <span class="k">ECHO WEAVE</span><span><span class="key-cap">S</span><span class="key-cap">SHIFT</span> freeze shadows in place for 5s</span>
+        <span class="k">PAUSE</span><span><span class="key-cap">P</span><span class="key-cap">ESC</span></span>
+        <span class="k">RESTART</span><span><span class="key-cap">R</span></span>
+        <span class="k">TOUCH</span><span>Drag to aim · buttons to move &amp; jump</span>
+      </div>
+    </div>
+    <div class="mt-6">
+      <div class="text-[11px] font-extrabold tracking-[0.22em] opacity-60 mb-2">BEST RUNS</div>
+      <div id="menuScores"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PAUSE -->
+<div id="pause" class="overlay hidden">
+  <div class="card glass" style="max-width:420px">
+    <h2 class="cyan-glow text-4xl font-black tracking-[0.18em] m-0">PAUSED</h2>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnResume">RESUME</button>
+      <button class="btn btn-ghost" id="btnRestart">RESTART LEVEL</button>
+      <button class="btn btn-ghost" id="btnMenu">ABANDON RUN</button>
+    </div>
+  </div>
+</div>
+
+<!-- GAME OVER -->
+<div id="gameover" class="overlay hidden">
+  <div class="card glass" style="max-width:460px">
+    <h2 class="rose-gradient text-5xl font-black tracking-[0.16em] m-0">DISSOLVED</h2>
+    <p class="opacity-70 text-sm mt-2">The light claimed another shadow.</p>
+    <div class="mt-4">
+      <div class="stat-row"><span>FINAL SCORE</span><span class="v" id="goScore">0</span></div>
+      <div class="stat-row"><span>LEVEL REACHED</span><span class="v" id="goLevel">1</span></div>
+      <div class="stat-row"><span>SHARDS GATHERED</span><span class="v" id="goShards">0</span></div>
+    </div>
+    <div class="mt-5">
+      <div class="text-[11px] font-extrabold tracking-[0.22em] opacity-60 mb-2">BEST RUNS</div>
+      <div id="finalScores"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnAgain">WEAVE AGAIN</button>
+      <button class="btn btn-ghost" id="btnMenu2">MENU</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEVEL COMPLETE -->
+<div id="levelup" class="overlay hidden" style="z-index:55">
+  <div class="card glass" style="max-width:420px">
+    <h2 class="title-gradient text-4xl font-black tracking-[0.16em] m-0">LEVEL <span id="luLevel">1</span> CLEAR</h2>
+    <div class="mt-4">
+      <div class="stat-row"><span>CLEAR BONUS</span><span class="v" id="luBonus">+250</span></div>
+      <div class="stat-row"><span>TIME BONUS</span><span class="v" id="luTime">+0</span></div>
+    </div>
+    <p class="opacity-60 text-xs mt-4 tracking-[0.18em]">TAP TO CONTINUE</p>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+   SHADOW WEAVER — a light & shadow puzzle-platformer
+   All HTML/CSS/JS in one file. No external assets.
+   ============================================================ */
+
+// ---------- Constants ----------
+const FLOOR_Y = 570;
+const LIGHT_Y = 120;
+const PLAYER_W = 26;
+const PLAYER_H = 34;
+const GRAVITY = 2100;
+const MOVE_SPEED = 272;
+const JUMP_V = 762;
+const MAX_RAMP_ANGLE = 55 * Math.PI / 180;
+const HS_KEY = 'shadowWeaverScores_v1';
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (a, b) => a + Math.random() * (b - a);
+const modf = (v, m) => ((v % m) + m) % m;
+
+// ---------- DOM ----------
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const hudEl = document.getElementById('hud');
+const hudLevel = document.getElementById('hudLevel');
+const hudScore = document.getElementById('hudScore');
+const hudShards = document.getElementById('hudShards');
+const heartsEl = document.getElementById('hearts');
+const dissolveFill = document.getElementById('dissolveFill');
+const weaveFill = document.getElementById('weaveFill');
+const menuEl = document.getElementById('menu');
+const pauseEl = document.getElementById('pause');
+const gameoverEl = document.getElementById('gameover');
+const levelupEl = document.getElementById('levelup');
+const toastEl = document.getElementById('toast');
+const hintEl = document.getElementById('hint');
+const touchControlsEl = document.getElementById('touchControls');
+const menuScoresEl = document.getElementById('menuScores');
+const finalScoresEl = document.getElementById('finalScores');
+const goScoreEl = document.getElementById('goScore');
+const goLevelEl = document.getElementById('goLevel');
+const goShardsEl = document.getElementById('goShards');
+const luLevelEl = document.getElementById('luLevel');
+const luBonusEl = document.getElementById('luBonus');
+const luTimeEl = document.getElementById('luTime');
+const iconSoundOn = document.getElementById('iconSoundOn');
+const iconSoundOff = document.getElementById('iconSoundOff');
+
+const HEART_SVG = '<svg viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9.5-8.5C.5 9 2.5 5 6.5 5c2.2 0 3.6 1.2 4.5 2.4C11.9 6.2 13.3 5 15.5 5c4 0 6 4 4 7.5C19 16.5 12 21 12 21z"/></svg>';
+
+// ---------- View / DPR ----------
+const VIEW = { w: window.innerWidth, h: window.innerHeight };
+const G = { canvas, ctx, dpr: 1 };
+const isCoarse = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+
+function resize() {
+  VIEW.w = window.innerWidth;
+  VIEW.h = window.innerHeight;
+  G.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(VIEW.w * G.dpr);
+  canvas.height = Math.floor(VIEW.h * G.dpr);
+  canvas.style.width = VIEW.w + 'px';
+  canvas.style.height = VIEW.h + 'px';
+  state.scale = Math.min(1, VIEW.h / 640);
+  state.worldBottom = Math.max(640, Math.ceil(VIEW.h / state.scale));
+  const visW = VIEW.w / state.scale;
+  state.camX = clamp(state.camX, 0, Math.max(0, state.worldW - visW));
+  initBg();
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 80));
+
+// ---------- Audio (WebAudio synth) ----------
+let actx = null, master = null, muted = false;
+function initAudio() {
+  if (actx) return;
+  try {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    master = actx.createGain();
+    master.gain.value = muted ? 0 : 0.5;
+    master.connect(actx.destination);
+  } catch (e) { /* no audio */ }
+}
+function tone(freq, dur, type, vol, freqEnd, delay) {
+  if (!actx || muted) return;
+  const t0 = actx.currentTime + (delay || 0);
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  if (freqEnd) o.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(vol, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(master);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+function noise(dur, vol, hp) {
+  if (!actx || muted) return;
+  const len = Math.max(1, Math.floor(actx.sampleRate * dur));
+  const buf = actx.createBuffer(1, len, actx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = actx.createBufferSource(); src.buffer = buf;
+  const f = actx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp || 500;
+  const g = actx.createGain(); g.gain.value = vol;
+  src.connect(f); f.connect(g); g.connect(master);
+  src.start();
+}
+const sfx = {
+  jump() { tone(280, 0.14, 'triangle', 0.14, 540); },
+  land() { noise(0.07, 0.07, 420); },
+  shard() { tone(880, 0.12, 'sine', 0.15); tone(1320, 0.2, 'sine', 0.13, null, 0.07); },
+  hurt() { tone(200, 0.3, 'sawtooth', 0.16, 70); noise(0.22, 0.1, 300); },
+  gate() { tone(330, 0.7, 'sine', 0.15, 880); },
+  freeze() { tone(1400, 0.28, 'sine', 0.13, 520); tone(2100, 0.2, 'sine', 0.08, 900, 0.05); noise(0.09, 0.045, 3200); },
+  shatter() { noise(0.2, 0.13, 1600); tone(980, 0.22, 'triangle', 0.09, 260); },
+  deny() { tone(170, 0.12, 'square', 0.06, 120); },
+  echo() { tone(740, 0.1, 'sine', 0.11); tone(1110, 0.14, 'sine', 0.09, null, 0.06); },
+  levelup() { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.16, 'sine', 0.15, null, i * 0.09)); },
+  gameover() { tone(300, 0.6, 'sine', 0.14, 90); tone(150, 0.85, 'sine', 0.09, 55, 0.12); },
+  click() { tone(700, 0.05, 'square', 0.06); }
+};
+function toggleMute() {
+  muted = !muted;
+  if (master) master.gain.value = muted ? 0 : 0.5;
+  iconSoundOn.classList.toggle('hidden', muted);
+  iconSoundOff.classList.toggle('hidden', !muted);
+}
+
+// ---------- Game state ----------
+const state = {
+  phase: 'menu',           // menu | playing | paused | levelcomplete | gameover
+  level: 1,
+  score: 0,
+  totalShards: 0,
+  newHigh: -1,
+  worldW: 2350,
+  worldBottom: 640,
+  scale: 1,
+  camX: 0,
+  lightX: 957,
+  lightTarget: 957,
+  dragging: false,
+  hasDragged: false,
+  shadows: [],
+  ramps: [],
+  shardsGot: 0,
+  gateActive: false,
+  levelStart: 0,
+  nextAt: 0,
+  lastGateHint: 0,
+  shakeMag: 0, shakeT: 0, shakeDur0: 1,
+  levelData: null,
+  frozen: [],
+  weaveEnergy: 100,
+  hasFrozen: false,
+  motes: [],
+  particles: [],
+  popups: [],
+  player: {
+    x: 150, y: 536, vx: 0, vy: 0, face: 1, hearts: 3, meter: 100, iframes: 1.2,
+    grounded: false, groundRamp: null, groundObj: null,
+    lastSafe: { x: 150, y: 536 },
+    trail: [], squash: 1, jumpBuf: 0, coyote: 0, _safe: true
+  }
+};
+
+const input = { left: false, right: false, jumpHeld: false, jumpPressed: false, lightL: false, lightR: false, weavePressed: false };
+
+// ---------- High scores ----------
+function loadScores() {
+  try { return JSON.parse(localStorage.getItem(HS_KEY) || '[]'); } catch (e) { return []; }
+}
+function saveScore(entry) {
+  const arr = loadScores();
+  arr.push(entry);
+  arr.sort((a, b) => b.s - a.s);
+  const trimmed = arr.slice(0, 5);
+  try { localStorage.setItem(HS_KEY, JSON.stringify(trimmed)); } catch (e) { /* ignore */ }
+  return trimmed.indexOf(entry);
+}
+function renderScores(el, highlight) {
+  const scores = loadScores();
+  let html = '<div class="score-row head"><span>#</span><span>SCORE</span><span>LV</span><span>SHARDS</span><span>DATE</span></div>';
+  if (!scores.length) {
+    el.innerHTML = html + '<div class="empty-scores">No runs yet — be the first.</div>';
+    return;
+  }
+  for (let i = 0; i < scores.length; i++) {
+    const s = scores[i];
+    const d = new Date(s.d);
+    const ds = (d.getMonth() + 1) + '/' + d.getDate();
+    html += '<div class="score-row' + (i === highlight ? ' highlight' : '') + '">' +
+      '<span>' + (i + 1) + '</span><span class="sc">' + s.s + '</span><span>' + s.l + '</span><span>' + s.sh + '</span><span>' + ds + '</span></div>';
+  }
+  el.innerHTML = html;
+}
+
+// ---------- Level generation ----------
+function generateLevel(lv) {
+  const worldW = 2200 + 150 * lv;
+  const startX = 150;
+  const objects = [];
+  // first monolith — medium height so the opening ramp is gentle
+  const firstY = 280 + Math.random() * 50;
+  const firstW = 80 + Math.random() * 30;
+  const firstH = 90 + Math.random() * 30;
+  objects.push({ x: 520, y: firstY, w: firstW, h: firstH, phase: Math.random() * 6.28, id: 0 });
+  let x = 520 + firstW + 260 + Math.random() * 120;
+  let id = 1;
+  while (x < worldW - 560) {
+    const w = 60 + Math.random() * 60;
+    const h = 50 + Math.random() * 80;
+    const yMax = Math.min(390, FLOOR_Y - 90 - h);
+    const y = Math.min(240 + Math.random() * 150, yMax);
+    objects.push({ x, y, w, h, phase: Math.random() * 6.28, id: id++ });
+    x += 240 + Math.random() * 180;
+  }
+  // floor segments with gaps
+  const nGaps = 1 + Math.min(2, Math.floor(lv / 2));
+  const gapXs = [];
+  let attempts = 0;
+  while (gapXs.length < nGaps && attempts < 60) {
+    attempts++;
+    const gx = 600 + Math.random() * (worldW - 1200);
+    if (Math.abs(gx - (worldW - 280)) < 170) continue;
+    if (gapXs.some(g => Math.abs(g - gx) < 520)) continue;
+    gapXs.push(gx);
+  }
+  gapXs.sort((a, b) => a - b);
+  const segs = [];
+  let prev = 0;
+  for (const gx of gapXs) {
+    segs.push({ x1: prev, x2: gx });
+    prev = gx + 90 + Math.random() * 40;
+  }
+  segs.push({ x1: prev, x2: worldW + 100 });
+  // glowing floor cracks
+  const cracks = [];
+  for (let i = 0; i < 26; i++) {
+    const seg = segs[Math.floor(Math.random() * segs.length)];
+    cracks.push({
+      x: seg.x1 + Math.random() * (seg.x2 - seg.x1),
+      y: FLOOR_Y + 10 + Math.random() * 46,
+      len: 8 + Math.random() * 14, dy: (Math.random() - 0.5) * 8,
+      a: 0.15 + Math.random() * 0.25
+    });
+  }
+  // starting light: put the first monolith's far ramp base at startX - 60
+  const o0 = objects[0];
+  const Bx = o0.x + o0.w, By = o0.y;
+  const dStart = (Bx - (startX - 60)) * (By - LIGHT_Y) / (FLOOR_Y - By);
+  const lightStart = clamp(Bx + dStart, 10, worldW - 10);
+  // shards
+  const shards = [];
+  const pushShard = (sx, sy) => {
+    if (sx < 30 || sx > worldW - 30) return false;
+    if (shards.some(s => Math.hypot(s.x - sx, s.y - sy) < 85)) return false;
+    for (const o of objects) {
+      if (sx > o.x - 22 && sx < o.x + o.w + 22 && sy > o.y - 22 && sy < o.y + o.h + 22) return false;
+    }
+    shards.push({ x: sx, y: sy, t: 0, taken: false, phase: Math.random() * 6.28 });
+    return true;
+  };
+  // first shard: mid-way up the opening ramp (visible & reachable immediately)
+  const run0 = (FLOOR_Y - By) * dStart / (By - LIGHT_Y);
+  const q1x = Bx - run0;
+  pushShard((q1x + Bx) / 2, (FLOOR_Y + By) / 2 - 55);
+  // ramp shards
+  const target = Math.min(5 + lv, 10);
+  let a2 = 0;
+  while (shards.length < target - 1 && a2 < 90) {
+    a2++;
+    const o = objects[Math.floor(Math.random() * objects.length)];
+    const right = Math.random() < 0.5;
+    const dMin = Math.max(170, (o.y - LIGHT_Y) * 0.84);
+    const d = dMin + Math.random() * (430 - dMin);
+    const Lx = right ? o.x + o.w + d : o.x - d;
+    if (Lx < 10 || Lx > worldW - 10) continue;
+    const tt = 0.3 + Math.random() * 0.55;
+    const rise = FLOOR_Y - o.y;
+    const run = rise * d / (o.y - LIGHT_Y);
+    const rx = right ? o.x + o.w - run * tt : o.x + run * tt;
+    const ry = o.y + rise * tt;
+    pushShard(rx, ry - 40 - Math.random() * 45);
+  }
+  // shards just above monolith tops
+  let a3 = 0;
+  while (shards.length < target && a3 < 40) {
+    a3++;
+    const o = objects[Math.floor(Math.random() * objects.length)];
+    pushShard(o.x + o.w / 2 + (Math.random() - 0.5) * 30, o.y - 45 - Math.random() * 25);
+  }
+  // one bonus shard on the floor (dash or shade it)
+  let a4 = 0;
+  while (a4 < 40) {
+    a4++;
+    const seg = segs[Math.floor(Math.random() * segs.length)];
+    const fx = seg.x1 + (seg.x2 - seg.x1) * (0.2 + Math.random() * 0.6);
+    if (Math.abs(fx - (worldW - 280)) < 130) continue;
+    if (pushShard(fx, FLOOR_Y - 26)) break;
+  }
+  const gate = { x: worldW - 280, y: FLOOR_Y - 58, t: 0 };
+  return { worldW, startX, objects, floorSegs: segs, cracks, lightStart, shards, gate };
+}
+
+// ---------- Shadow geometry ----------
+function bobbed(o) {
+  return { x: o.x, y: o.y + Math.sin(performance.now() / 1000 * 0.9 + o.phase) * 4, w: o.w, h: o.h };
+}
+function castShadow(o, L) {
+  const ob = bobbed(o);
+  const A = { x: ob.x, y: ob.y }, B = { x: ob.x + ob.w, y: ob.y };
+  const C = { x: ob.x + ob.w, y: ob.y + ob.h }, D = { x: ob.x, y: ob.y + ob.h };
+  const proj = (P) => {
+    const t = (FLOOR_Y - L.y) / (P.y - L.y);
+    return { x: L.x + t * (P.x - L.x), y: FLOOR_Y };
+  };
+  let quad, far, near;
+  if (L.x >= B.x) {
+    const q1 = proj(B), q2 = proj(C);
+    quad = [B, C, q2, q1]; far = [q1, B]; near = [C, q2];
+  } else if (L.x <= A.x) {
+    const q1 = proj(A), q2 = proj(D);
+    quad = [A, D, q2, q1]; far = [q1, A]; near = [D, q2];
+  } else {
+    const qD = proj(D), qC = proj(C);
+    quad = [D, C, qC, qD]; far = [qD, D]; near = [C, qC];
+  }
+  const ramps = [];
+  const sides = [[far, 'F'], [near, 'N']];
+  for (const [pair, tag] of sides) {
+    const rise = Math.abs(pair[1].y - pair[0].y);
+    const run = Math.abs(pair[1].x - pair[0].x);
+    if (run > 0.5 && Math.atan2(rise, run) <= MAX_RAMP_ANGLE) {
+      ramps.push({ a: pair[0], b: pair[1], minX: Math.min(pair[0].x, pair[1].x), maxX: Math.max(pair[0].x, pair[1].x), key: 'L' + o.id + tag, frozenSet: null });
+    }
+  }
+  return { quad, ramps };
+}
+function computeShadows() {
+  state.shadows = [];
+  state.ramps = [];
+  const L = { x: state.lightX, y: LIGHT_Y };
+  for (const o of state.levelData.objects) {
+    const sh = castShadow(o, L);
+    state.shadows.push(sh);
+    for (const r of sh.ramps) state.ramps.push(r);
+  }
+  for (const fz of state.frozen) {
+    for (const r of fz.ramps) state.ramps.push(r);
+  }
+}
+// ---------- Echo Weave (freeze shadows) ----------
+const FREEZE_COST = 40, FREEZE_LIFE = 5;
+let freezeCounter = 0;
+function doFreeze() {
+  if (state.weaveEnergy < FREEZE_COST) {
+    sfx.deny();
+    toast('WEAVE ENERGY TOO LOW');
+    return;
+  }
+  const fz = { quads: [], ramps: [], life: FREEZE_LIFE, maxLife: FREEZE_LIFE, rewarded: false, id: ++freezeCounter };
+  for (const sh of state.shadows) {
+    fz.quads.push(sh.quad.map(pt => ({ x: pt.x, y: pt.y })));
+    for (const r of sh.ramps) {
+      fz.ramps.push({
+        a: { x: r.a.x, y: r.a.y }, b: { x: r.b.x, y: r.b.y },
+        minX: r.minX, maxX: r.maxX,
+        key: 'FZ' + fz.id + '_' + fz.ramps.length, frozenSet: fz
+      });
+    }
+  }
+  state.frozen.push(fz);
+  if (state.frozen.length > 2) shatterFrozen(state.frozen.shift());
+  state.weaveEnergy -= FREEZE_COST;
+  sfx.freeze();
+  shake(3, 0.16);
+  for (const q of fz.quads) {
+    for (const pt of q) burst(pt.x, pt.y, '#d8c4ff', 3, { speed: 70, grav: 40 });
+  }
+  if (!state.hasFrozen) {
+    state.hasFrozen = true;
+    toast('SHADOWS CRYSTALLIZED — NOW RECAST THE LIGHT');
+  }
+}
+function shatterFrozen(fz) {
+  sfx.shatter();
+  shake(3, 0.14);
+  for (const q of fz.quads) {
+    const cx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4;
+    const cy = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
+    burst(cx, cy, '#b18cff', 9, { speed: 140, grav: 280 });
+    for (const pt of q) burst(pt.x, pt.y, '#d8c4ff', 3, { speed: 90, grav: 280 });
+  }
+}
+function updateWeave(dt) {
+  if (input.weavePressed) {
+    input.weavePressed = false;
+    doFreeze();
+  }
+  state.weaveEnergy = Math.min(100, state.weaveEnergy + 12 * dt);
+  for (let i = state.frozen.length - 1; i >= 0; i--) {
+    const fz = state.frozen[i];
+    fz.life -= dt;
+    if (fz.life <= 0) {
+      shatterFrozen(fz);
+      state.frozen.splice(i, 1);
+    }
+  }
+}
+
+function rampY(r, x) {
+  const t = (x - r.a.x) / (r.b.x - r.a.x);
+  return r.a.y + t * (r.b.y - r.a.y);
+}
+function pointInTri(px, py, ax, ay, bx, by, cx, cy) {
+  const d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
+  const d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
+  const d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
+  const hasNeg = d1 < 0 || d2 < 0 || d3 < 0;
+  const hasPos = d1 > 0 || d2 > 0 || d3 > 0;
+  return !(hasNeg && hasPos);
+}
+function pointInQuad(px, py, q) {
+  return pointInTri(px, py, q[0].x, q[0].y, q[1].x, q[1].y, q[2].x, q[2].y) ||
+         pointInTri(px, py, q[0].x, q[0].y, q[2].x, q[2].y, q[3].x, q[3].y);
+}
+function distToSeg(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const l2 = dx * dx + dy * dy;
+  if (l2 === 0) return Math.hypot(px - ax, py - ay);
+  const t = clamp(((px - ax) * dx + (py - ay) * dy) / l2, 0, 1);
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+function isSafe(px, py) {
+  for (const sh of state.shadows) {
+    if (pointInQuad(px, py, sh.quad)) return true;
+  }
+  for (const sh of state.shadows) {
+    const q = sh.quad;
+    for (let i = 0; i < 4; i++) {
+      if (distToSeg(px, py, q[i].x, q[i].y, q[(i + 1) % 4].x, q[(i + 1) % 4].y) < 20) return true;
+    }
+  }
+  for (const fz of state.frozen) {
+    for (const q of fz.quads) {
+      if (pointInQuad(px, py, q)) return true;
+      for (let i = 0; i < 4; i++) {
+        if (distToSeg(px, py, q[i].x, q[i].y, q[(i + 1) % 4].x, q[(i + 1) % 4].y) < 20) return true;
+      }
+    }
+  }
+  for (const o of state.levelData.objects) {
+    const ob = bobbed(o);
+    if (px > ob.x && px < ob.x + ob.w && py > ob.y && py < ob.y + ob.h) return true;
+  }
+  return false;
+}
+
+// ---------- Particles / popups ----------
+function burst(x, y, color, n, opt) {
+  opt = opt || {};
+  const sp = opt.speed || 150, gr = opt.grav || 300;
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const v = sp * (0.35 + Math.random() * 0.95);
+    state.particles.push({
+      x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 30,
+      life: 0.5 + Math.random() * 0.5, maxLife: 0.95,
+      color, size: 1.8 + Math.random() * 2.6, grav: gr
+    });
+  }
+  if (state.particles.length > 320) state.particles.splice(0, state.particles.length - 320);
+}
+function spawnWisp(x, y) {
+  state.particles.push({
+    x, y, vx: (Math.random() - 0.5) * 26, vy: -14 - Math.random() * 26,
+    life: 0.7 + Math.random() * 0.6, maxLife: 1.2,
+    color: '#7df9ff', size: 1.3 + Math.random() * 1.8, grav: -26
+  });
+}
+function spawnDissolve(x, y) {
+  state.particles.push({
+    x, y, vx: (Math.random() - 0.5) * 40, vy: -8 - Math.random() * 18,
+    life: 0.35 + Math.random() * 0.35, maxLife: 0.7,
+    color: '#ffd76a', size: 1.3 + Math.random() * 1.8, grav: -18
+  });
+}
+function updateParticles(dt) {
+  const arr = state.particles;
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const p = arr[i];
+    p.life -= dt;
+    if (p.life <= 0) { arr.splice(i, 1); continue; }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+  }
+}
+function addPopup(x, y, text) {
+  state.popups.push({ x, y, text, life: 0.9, maxLife: 0.9 });
+  if (state.popups.length > 12) state.popups.shift();
+}
+function updatePopups(dt) {
+  const arr = state.popups;
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const p = arr[i];
+    p.y -= 44 * dt;
+    p.life -= dt;
+    if (p.life <= 0) arr.splice(i, 1);
+  }
+}
+
+// ---------- Shake ----------
+function shake(mag, dur) {
+  state.shakeMag = Math.max(state.shakeMag, mag);
+  state.shakeT = Math.max(state.shakeT, dur);
+  state.shakeDur0 = Math.max(state.shakeDur0, dur);
+}
+function currentShake() {
+  if (state.shakeT > 0) {
+    const f = state.shakeT / state.shakeDur0;
+    return { x: (Math.random() * 2 - 1) * state.shakeMag * f, y: (Math.random() * 2 - 1) * state.shakeMag * f };
+  }
+  return { x: 0, y: 0 };
+}
+
+// ---------- Player ----------
+function hurtPlayer() {
+  const p = state.player;
+  if (p.iframes > 0) return;
+  p.hearts -= 1;
+  sfx.hurt();
+  shake(9, 0.4);
+  burst(p.x, p.y + 15, '#ff6b8a', 24, { speed: 200, grav: 200 });
+  burst(p.x, p.y + 15, '#7df9ff', 14, { speed: 140, grav: 200 });
+  p.meter = 100;
+  if (p.hearts <= 0) { gameOver(); return; }
+  p.iframes = 2.2;
+  p.vx = 0; p.vy = 0;
+  p.jumpBuf = 0; p.coyote = 0;
+  p.x = p.lastSafe.x; p.y = p.lastSafe.y;
+  p.grounded = false; p.groundRamp = null; p.groundObj = null;
+  p.trail = [];
+  updateHUD();
+}
+function updatePlayer(dt) {
+  const p = state.player;
+  p.squash += (1 - p.squash) * Math.min(1, dt * 10);
+  // horizontal
+  let ax = 0;
+  if (input.left) ax -= 1;
+  if (input.right) ax += 1;
+  if (ax !== 0) {
+    p.vx = lerp(p.vx, ax * MOVE_SPEED, Math.min(1, dt * 16));
+    p.face = ax > 0 ? 1 : -1;
+    if (Math.abs(p.vx) > 40) {
+      p.trail.push({ x: p.x, y: p.y });
+      if (p.trail.length > 9) p.trail.shift();
+      if (Math.random() < dt * 9) spawnWisp(p.x - p.face * 8, p.y + 20);
+    }
+  } else {
+    p.vx = lerp(p.vx, 0, Math.min(1, dt * 13));
+  }
+  // jump buffer + coyote
+  if (input.jumpPressed) { p.jumpBuf = 0.12; input.jumpPressed = false; }
+  p.jumpBuf = Math.max(0, p.jumpBuf - dt);
+  if (p.grounded) p.coyote = 0.1;
+  p.coyote = Math.max(0, p.coyote - dt);
+  if (p.jumpBuf > 0 && (p.grounded || p.coyote > 0)) {
+    p.vy = -JUMP_V;
+    p.grounded = false; p.groundRamp = null; p.groundObj = null;
+    p.jumpBuf = 0; p.coyote = 0;
+    p.squash = 1.28;
+    burst(p.x, p.y + PLAYER_H, '#7df9ff', 8, { speed: 90, grav: 300 });
+    sfx.jump();
+  }
+  if (!input.jumpHeld && p.vy < -250) p.vy = -250;
+  // gravity + integrate
+  p.vy += GRAVITY * dt;
+  if (p.vy > 1150) p.vy = 1150;
+  const prevX = p.x, prevY = p.y;
+  p.x += p.vx * dt;
+  p.y += p.vy * dt;
+  p.x = clamp(p.x, 6, state.worldW - 6);
+  const prevFeet = prevY + PLAYER_H, prevHead = prevY;
+  const prevLeft = prevX - PLAYER_W / 2, prevRight = prevX + PLAYER_W / 2;
+  const feet = p.y + PLAYER_H, head = p.y, px = p.x;
+  const prevVy = p.vy;
+  const standingRamp = p.groundRamp;
+  const wasGrounded = p.grounded;
+  p.grounded = false;
+  p.groundRamp = null;
+  p.groundObj = null;
+  // solid monoliths
+  for (const o of state.levelData.objects) {
+    const ob = bobbed(o);
+    if (px + PLAYER_W / 2 <= ob.x || px - PLAYER_W / 2 >= ob.x + ob.w) continue;
+    if (feet <= ob.y || head >= ob.y + ob.h) continue;
+    if (prevFeet <= ob.y + 1 && p.vy >= 0) {
+      p.y = ob.y - PLAYER_H; p.vy = 0; p.grounded = true; p.groundObj = o;
+    } else if (prevHead >= ob.y + ob.h - 1 && p.vy < 0) {
+      p.y = ob.y + ob.h; p.vy = 0;
+    } else if (prevRight <= ob.x + 0.5) {
+      p.x = ob.x - PLAYER_W / 2; if (p.vx > 0) p.vx = 0;
+    } else if (prevLeft >= ob.x + ob.w - 0.5) {
+      p.x = ob.x + ob.w + PLAYER_W / 2; if (p.vx < 0) p.vx = 0;
+    } else {
+      const topPen = ob.y + ob.h - head, botPen = feet - ob.y;
+      if (topPen < botPen) { p.y = ob.y + ob.h; if (p.vy < 0) p.vy = 0; }
+      else { p.y = ob.y - PLAYER_H; if (p.vy > 0) p.vy = 0; }
+    }
+  }
+  // follow bobbing monolith
+  if (p.groundObj) {
+    const ob = bobbed(p.groundObj);
+    if (ob.y >= p.y - 6 && ob.y <= p.y + PLAYER_H + 6) p.y = ob.y - PLAYER_H;
+    else { p.grounded = false; p.groundObj = null; }
+  }
+  // shadow ramps (one-way with follow)
+  for (const r of state.ramps) {
+    if (px < r.minX - 2 || px > r.maxX + 2) continue;
+    const sy = rampY(r, px);
+    if (wasGrounded && standingRamp && standingRamp.key === r.key) {
+      if (sy >= p.y - 8 && sy <= p.y + PLAYER_H + 8) {
+        p.y = sy - PLAYER_H; p.vy = 0; p.grounded = true; p.groundRamp = r;
+      }
+      break;
+    }
+    if (p.vy >= 0 && prevFeet <= sy + 2 && feet >= sy) {
+      p.y = sy - PLAYER_H; p.vy = 0; p.grounded = true; p.groundRamp = r;
+      if (r.frozenSet && !r.frozenSet.rewarded && !wasGrounded) {
+        r.frozenSet.rewarded = true;
+        state.score += 25;
+        addPopup(px, sy - 26, 'ECHO +25');
+        sfx.echo();
+        updateHUD();
+      }
+      if (prevVy > 500) {
+        p.squash = 0.72;
+        burst(px, sy, '#7df9ff', 10, { speed: 110, grav: 420 });
+        sfx.land();
+        shake(2.5, 0.1);
+      }
+      break;
+    }
+  }
+  // floor
+  if (p.y + PLAYER_H >= FLOOR_Y) {
+    for (const seg of state.levelData.floorSegs) {
+      if (px >= seg.x1 - 4 && px <= seg.x2 + 4) {
+        p.y = FLOOR_Y - PLAYER_H;
+        if (!wasGrounded && prevVy > 500) {
+          p.squash = 0.72;
+          burst(px, FLOOR_Y, '#7df9ff', 10, { speed: 110, grav: 420 });
+          sfx.land();
+          shake(2.5, 0.1);
+        }
+        p.grounded = true;
+        p.vy = 0;
+        break;
+      }
+    }
+  }
+  // safety / dissolve
+  const safe = isSafe(px, p.y + PLAYER_H * 0.5);
+  p._safe = safe;
+  if (p.iframes > 0) {
+    p.iframes -= dt;
+  } else if (safe) {
+    p.meter = Math.min(100, p.meter + 55 * dt);
+    if (p.grounded) p.lastSafe = { x: p.x, y: p.y };
+  } else {
+    p.meter -= 38 * dt;
+    if (Math.random() < dt * 16) spawnDissolve(p.x + (Math.random() - 0.5) * 16, p.y + 10 + Math.random() * 16);
+    if (p.meter <= 0) hurtPlayer();
+  }
+  if (p.y > state.worldBottom + 60) { p.iframes = 0; hurtPlayer(); }
+}
+
+// ---------- Shards & gate ----------
+function updateShards(dt) {
+  const p = state.player;
+  const pcx = p.x, pcy = p.y + PLAYER_H * 0.5;
+  for (const s of state.levelData.shards) {
+    if (s.taken) continue;
+    s.t += dt;
+    if (Math.random() < dt * 2.5) spawnWisp(s.x + (Math.random() - 0.5) * 26, s.y - 10 + (Math.random() - 0.5) * 26);
+    const sy = s.y + Math.sin(s.t * 2.4) * 5;
+    if (Math.hypot(pcx - s.x, pcy - sy) < 30) {
+      s.taken = true;
+      state.shardsGot++;
+      state.totalShards++;
+      state.score += 100;
+      state.weaveEnergy = Math.min(100, state.weaveEnergy + 25);
+      sfx.shard();
+      burst(s.x, sy, '#ffd76a', 18, { speed: 170, grav: 160 });
+      addPopup(s.x, sy - 18, '+100');
+      updateHUD();
+      if (state.shardsGot >= state.levelData.shards.length) {
+        state.gateActive = true;
+        sfx.gate();
+        toast('THE GATE IS OPEN — REACH THE PORTAL');
+        shake(5, 0.25);
+        const g = state.levelData.gate;
+        burst(g.x, g.y, '#ffd76a', 30, { speed: 200, grav: 100 });
+      }
+    }
+  }
+}
+function updateGate(dt) {
+  const g = state.levelData.gate;
+  g.t += dt;
+  const p = state.player;
+  const d = Math.hypot(p.x - g.x, (p.y + PLAYER_H * 0.5) - g.y);
+  if (state.gateActive && d < 46) { levelComplete(); return; }
+  if (!state.gateActive && d < 80 && Math.random() < dt * 0.5 && performance.now() - state.lastGateHint > 2600) {
+    toast('COLLECT ALL SHARDS TO OPEN THE GATE');
+    state.lastGateHint = performance.now();
+  }
+  if (state.gateActive && Math.random() < dt * 26) {
+    spawnWisp(g.x + (Math.random() - 0.5) * 52, g.y + (Math.random() - 0.5) * 52);
+  }
+}
+
+// ---------- Camera / light / motes ----------
+function updateCamera(dt) {
+  const visW = VIEW.w / state.scale;
+  const target = state.player.x - visW / 3;
+  state.camX = lerp(state.camX, target, Math.min(1, dt * 5.5));
+  state.camX = clamp(state.camX, 0, Math.max(0, state.worldW - visW));
+}
+function updateLight(dt, t) {
+  if (state.phase === 'menu') {
+    state.lightTarget = state.worldW * 0.5 + Math.sin(t * 0.25) * state.worldW * 0.38;
+  } else {
+    if (input.lightL) state.lightTarget -= 520 * dt;
+    if (input.lightR) state.lightTarget += 520 * dt;
+  }
+  state.lightTarget = clamp(state.lightTarget, 10, state.worldW - 10);
+  state.lightX += (state.lightTarget - state.lightX) * Math.min(1, dt * 18);
+}
+function initMotes() {
+  state.motes = [];
+  const visW = VIEW.w / state.scale;
+  for (let i = 0; i < 34; i++) {
+    state.motes.push({
+      x: state.camX + Math.random() * visW, y: 60 + Math.random() * 500,
+      vx: (Math.random() - 0.5) * 24, size: 1 + Math.random() * 1.6,
+      c: Math.random() < 0.5 ? '#ffd76a' : '#7df9ff',
+      a: 0.14 + Math.random() * 0.24, p: Math.random() * 6.28
+    });
+  }
+}
+function updateMotes(dt) {
+  const visW = VIEW.w / state.scale;
+  for (const m of state.motes) {
+    m.x += m.vx * dt;
+    if (m.x < state.camX - 40) m.x += visW + 80;
+    if (m.x > state.camX + visW + 40) m.x -= visW + 80;
+  }
+}
+let stars = [], bgMono = [];
+function initBg() {
+  stars = [];
+  for (let i = 0; i < 80; i++) {
+    stars.push({ x: Math.random() * Math.max(VIEW.w, 400), y: Math.random() * 320, r: 0.5 + Math.random() * 1.2, p: Math.random() * 6.28 });
+  }
+  bgMono = [];
+  const cols = ['#18113a', '#140d33', '#1c1342'];
+  for (let i = 0; i < 18; i++) {
+    bgMono.push({
+      x: -450 + Math.random() * (Math.max(VIEW.w, 400) + 900),
+      y: 300 + Math.random() * 240, w: 50 + Math.random() * 120, h: 120 + Math.random() * 200,
+      c: cols[Math.floor(Math.random() * 3)]
+    });
+  }
+}
+
+// ---------- Rendering ----------
+function rr(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function drawFloor() {
+  const ld = state.levelData;
+  ctx.fillStyle = '#16102e';
+  for (const seg of ld.floorSegs) {
+    ctx.fillRect(seg.x1, FLOOR_Y, seg.x2 - seg.x1, state.worldBottom - FLOOR_Y + 20);
+  }
+  ctx.fillStyle = 'rgba(110,231,255,0.13)';
+  for (const seg of ld.floorSegs) {
+    ctx.fillRect(seg.x1, FLOOR_Y, seg.x2 - seg.x1, 3);
+  }
+  for (const c of ld.cracks) {
+    ctx.strokeStyle = 'rgba(110,231,255,' + c.a + ')';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(c.x, c.y);
+    ctx.lineTo(c.x + c.len, c.y + c.dy);
+    ctx.stroke();
+  }
+}
+function drawLight(t) {
+  const lx = state.lightX, ly = LIGHT_Y;
+  // god rays
+  ctx.save();
+  ctx.translate(lx, ly);
+  ctx.globalAlpha = 0.05;
+  ctx.fillStyle = '#ffd27a';
+  for (let i = 0; i < 5; i++) {
+    ctx.save();
+    ctx.rotate(t * 0.1 + i * (Math.PI * 2 / 5));
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(55, 1250);
+    ctx.lineTo(-55, 1250);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+  // warm wash
+  const g = ctx.createRadialGradient(lx, ly, 10, lx, ly, 900);
+  g.addColorStop(0, 'rgba(255,205,120,0.20)');
+  g.addColorStop(0.5, 'rgba(255,180,90,0.07)');
+  g.addColorStop(1, 'rgba(255,180,90,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(lx, ly, 900, 0, 7); ctx.fill();
+  // rail
+  ctx.setLineDash([6, 10]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(10, ly); ctx.lineTo(state.worldW - 10, ly); ctx.stroke();
+  ctx.setLineDash([]);
+  // orb
+  const og = ctx.createRadialGradient(lx - 4, ly - 5, 0, lx, ly, 26);
+  og.addColorStop(0, '#fff6d8');
+  og.addColorStop(0.4, '#ffd27a');
+  og.addColorStop(1, 'rgba(255,140,50,0)');
+  ctx.fillStyle = og;
+  ctx.beginPath(); ctx.arc(lx, ly, 26, 0, 7); ctx.fill();
+  // "drag me" pulse until first interaction
+  if (!state.hasDragged && state.phase === 'playing') {
+    const pu = 0.5 + 0.5 * Math.sin(t * 3);
+    ctx.strokeStyle = 'rgba(255,255,255,' + (0.3 + 0.3 * pu) + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(lx, ly, 34 + pu * 6, 0, 7); ctx.stroke();
+  }
+}
+function drawMonolith(o) {
+  const ob = bobbed(o);
+  const g = ctx.createLinearGradient(0, ob.y, 0, ob.y + ob.h);
+  g.addColorStop(0, '#33275c');
+  g.addColorStop(0.5, '#221842');
+  g.addColorStop(1, '#150e30');
+  rr(ob.x, ob.y, ob.w, ob.h, 5);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(140,110,230,0.35)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(180,150,255,0.25)';
+  ctx.fillRect(ob.x + 3, ob.y + 2, ob.w - 6, 3);
+}
+function drawRune(o, t) {
+  const ob = bobbed(o);
+  const cx = ob.x + ob.w / 2, cy = ob.y + ob.h / 2;
+  const pu = 0.6 + 0.4 * Math.sin(t * 2 + o.phase);
+  ctx.strokeStyle = 'rgba(125,249,255,' + (0.3 * pu + 0.25) + ')';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 12);
+  ctx.lineTo(cx + 9, cy);
+  ctx.lineTo(cx, cy + 12);
+  ctx.lineTo(cx - 9, cy);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(125,249,255,' + (0.5 * pu) + ')';
+  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, 7); ctx.fill();
+}
+function drawShadows() {
+  if (!state.shadows.length) return;
+  ctx.fillStyle = 'rgba(6,3,20,0.62)';
+  ctx.beginPath();
+  for (const sh of state.shadows) {
+    const q = sh.quad;
+    ctx.moveTo(q[0].x, q[0].y);
+    for (let i = 1; i < 4; i++) ctx.lineTo(q[i].x, q[i].y);
+    ctx.closePath();
+  }
+  ctx.fill();
+}
+function drawFrozen(t) {
+  for (const fz of state.frozen) {
+    let a = 1;
+    if (fz.life < 1.2) a = 0.35 + 0.65 * Math.abs(Math.sin(t * 13));
+    ctx.globalAlpha = a;
+    for (const q of fz.quads) {
+      ctx.beginPath();
+      ctx.moveTo(q[0].x, q[0].y);
+      for (let i = 1; i < 4; i++) ctx.lineTo(q[i].x, q[i].y);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(120,90,220,0.30)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(196,160,255,0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // crystal facets
+      ctx.strokeStyle = 'rgba(196,160,255,0.25)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(q[0].x, q[0].y); ctx.lineTo(q[2].x, q[2].y);
+      ctx.moveTo(q[1].x, q[1].y); ctx.lineTo(q[3].x, q[3].y);
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+function drawRampGlow(t) {
+  for (const r of state.ramps) {
+    const pulse = 0.75 + 0.25 * Math.sin(t * 2.5 + r.minX * 0.01);
+    let under, over;
+    if (r.frozenSet) {
+      const blink = r.frozenSet.life < 1.2 ? 0.35 + 0.65 * Math.abs(Math.sin(t * 13)) : 1;
+      under = 'rgba(177,140,255,' + (0.16 * blink) + ')';
+      over = 'rgba(216,196,255,' + (0.85 * pulse * blink) + ')';
+    } else {
+      under = 'rgba(110,231,255,0.14)';
+      over = 'rgba(150,240,255,' + (0.8 * pulse) + ')';
+    }
+    ctx.strokeStyle = under;
+    ctx.lineWidth = 9;
+    ctx.beginPath(); ctx.moveTo(r.a.x, r.a.y); ctx.lineTo(r.b.x, r.b.y); ctx.stroke();
+    ctx.strokeStyle = over;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(r.a.x, r.a.y); ctx.lineTo(r.b.x, r.b.y); ctx.stroke();
+  }
+}
+function drawShard(s, t) {
+  if (s.taken) return;
+  const y = s.y + Math.sin(s.t * 2.4) * 5;
+  const wob = Math.abs(Math.cos((t + s.phase) * 3.1));
+  ctx.fillStyle = 'rgba(255,200,80,0.13)';
+  ctx.beginPath(); ctx.arc(s.x, y, 26, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,200,80,0.22)';
+  ctx.beginPath(); ctx.arc(s.x, y, 14, 0, 7); ctx.fill();
+  ctx.save();
+  ctx.translate(s.x, y);
+  ctx.scale(Math.max(0.18, wob), 1);
+  ctx.fillStyle = '#ffd76a';
+  ctx.strokeStyle = '#fff3d0';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -11); ctx.lineTo(8, 0); ctx.lineTo(0, 11); ctx.lineTo(-8, 0);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+  if (Math.sin(t * 3 + s.phase) > 0.72) {
+    ctx.strokeStyle = 'rgba(255,243,208,0.9)';
+    ctx.lineWidth = 1.5;
+    const sx = s.x + 12, sy = y - 12;
+    ctx.beginPath();
+    ctx.moveTo(sx - 4, sy); ctx.lineTo(sx + 4, sy);
+    ctx.moveTo(sx, sy - 4); ctx.lineTo(sx, sy + 4);
+    ctx.stroke();
+  }
+}
+function drawGate(t) {
+  const g = state.levelData.gate;
+  const active = state.gateActive;
+  const c1 = active ? '#ffd76a' : '#3d4f7a';
+  const c2 = active ? '#7df9ff' : '#2a3a5e';
+  // base stones
+  ctx.fillStyle = '#221842';
+  ctx.fillRect(g.x - 34, FLOOR_Y - 10, 14, 10);
+  ctx.fillRect(g.x + 20, FLOOR_Y - 10, 14, 10);
+  ctx.save();
+  ctx.translate(g.x, g.y);
+  for (let i = 0; i < 3; i++) {
+    ctx.strokeStyle = i === 0 ? c1 : c2;
+    ctx.globalAlpha = 0.9 - i * 0.2;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    const rr2 = 30 + i * 7;
+    ctx.arc(0, 0, rr2, t * 1.4 + i * 2, t * 1.4 + i * 2 + Math.PI * 1.3);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  if (active) {
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 26);
+    grad.addColorStop(0, 'rgba(125,249,255,0.5)');
+    grad.addColorStop(1, 'rgba(125,249,255,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0, 0, 26, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawPlayer(t) {
+  if (state.phase === 'menu') return;
+  const p = state.player;
+  let alpha = 1;
+  if (p.iframes > 0) alpha = 0.45 + 0.35 * Math.sin(t * 30);
+  if (!p._safe && p.iframes <= 0) alpha *= 0.6 + 0.4 * (p.meter / 100);
+  // trail
+  for (let i = 0; i < p.trail.length; i++) {
+    const tr = p.trail[i];
+    const f = 1 - i / p.trail.length;
+    ctx.globalAlpha = alpha * f * 0.3;
+    ctx.fillStyle = '#7df9ff';
+    ctx.beginPath();
+    ctx.arc(tr.x, tr.y + PLAYER_H * 0.7, 5 * f, 0, 7);
+    ctx.fill();
+  }
+  ctx.globalAlpha = alpha;
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  // squash & stretch (volume preserving)
+  const sq = p.squash;
+  ctx.scale(1 / Math.sqrt(sq), sq);
+  ctx.rotate(clamp(p.vx / MOVE_SPEED, -1, 1) * 0.07);
+  const rim = p._safe ? '#6ef2ff' : '#ffd76a';
+  const glow = p._safe ? 'rgba(70,224,255,0.9)' : 'rgba(255,176,58,0.9)';
+  // wafting tail
+  for (let i = 3; i >= 1; i--) {
+    const tx = Math.sin(t * 7 + i * 1.4) * (2 + i * 1.2);
+    ctx.fillStyle = i === 3 ? 'rgba(11,7,34,0.35)' : 'rgba(11,7,34,0.6)';
+    ctx.strokeStyle = 'rgba(110,231,255,' + (0.25 * alpha) + ')';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(tx, PLAYER_H + i * 4, 5 - i * 0.9, 0, 7);
+    ctx.fill(); ctx.stroke();
+  }
+  // body
+  ctx.beginPath();
+  ctx.moveTo(0, PLAYER_H);
+  ctx.bezierCurveTo(-13, 24, -12, 6, 0, 0);
+  ctx.bezierCurveTo(12, 6, 13, 24, 0, PLAYER_H);
+  ctx.closePath();
+  ctx.fillStyle = '#0b0722';
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = rim;
+  ctx.shadowColor = glow;
+  ctx.shadowBlur = 12;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  // eyes
+  const ex = p.face * 3;
+  ctx.fillStyle = '#eaffff';
+  ctx.shadowColor = '#7df9ff';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(-4.5 + ex, 12, 2.8, 0, 7);
+  ctx.arc(4.5 + ex, 12, 2.8, 0, 7);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+function drawParticles() {
+  ctx.globalCompositeOperation = 'lighter';
+  for (const p of state.particles) {
+    ctx.globalAlpha = clamp(p.life / p.maxLife, 0, 1) * 0.8;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, 7);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+}
+function drawPopups() {
+  ctx.textAlign = 'center';
+  ctx.font = '800 16px "Segoe UI", system-ui, sans-serif';
+  for (const p of state.popups) {
+    ctx.globalAlpha = clamp(p.life / p.maxLife, 0, 1);
+    ctx.fillStyle = '#ffd76a';
+    ctx.fillText(p.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawMotes(t) {
+  for (const m of state.motes) {
+    ctx.globalAlpha = m.a * (0.6 + 0.4 * Math.sin(t * 1.5 + m.p));
+    ctx.fillStyle = m.c;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y, m.size, 0, 7);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function render(t) {
+  const sc = state.scale;
+  const visW = VIEW.w / sc;
+  ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
+  // sky
+  const bg = ctx.createLinearGradient(0, 0, 0, VIEW.h);
+  bg.addColorStop(0, '#0a0620');
+  bg.addColorStop(0.55, '#160d3a');
+  bg.addColorStop(1, '#07041a');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, VIEW.w, VIEW.h);
+  // stars
+  ctx.fillStyle = '#cfe9ff';
+  for (const s of stars) {
+    const sx = modf(s.x - state.camX * 0.12, VIEW.w);
+    ctx.globalAlpha = 0.25 + 0.55 * Math.abs(Math.sin(t * 0.8 + s.p));
+    ctx.beginPath(); ctx.arc(sx, s.y, s.r, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // distant monoliths (parallax)
+  ctx.save();
+  ctx.translate(-state.camX * 0.35, 0);
+  for (const m of bgMono) {
+    ctx.fillStyle = m.c;
+    ctx.fillRect(m.x, m.y, m.w, m.h);
+    ctx.fillStyle = 'rgba(125,249,255,0.05)';
+    ctx.fillRect(m.x, m.y, m.w, 3);
+  }
+  ctx.restore();
+  // world
+  const sh = currentShake();
+  ctx.save();
+  ctx.setTransform(G.dpr * sc, 0, 0, G.dpr * sc, sh.x, sh.y);
+  ctx.translate(-state.camX, 0);
+  drawFloor();
+  drawLight(t);
+  for (const o of state.levelData.objects) drawMonolith(o);
+  drawShadows();
+  drawFrozen(t);
+  for (const o of state.levelData.objects) drawRune(o, t);
+  drawRampGlow(t);
+  drawMotes(t);
+  for (const s of state.levelData.shards) drawShard(s, t);
+  drawGate(t);
+  drawPopups();
+  drawPlayer(t);
+  drawParticles();
+  ctx.restore();
+}
+
+// ---------- HUD / overlays ----------
+function updateHUD() {
+  hudLevel.textContent = state.level;
+  hudScore.textContent = state.score;
+  hudShards.textContent = state.shardsGot + '/' + state.levelData.shards.length;
+  heartsEl.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    const d = document.createElement('div');
+    d.className = 'heart' + (i < state.player.hearts ? '' : ' lost');
+    d.innerHTML = HEART_SVG;
+    heartsEl.appendChild(d);
+  }
+  dissolveFill.style.width = clamp(state.player.meter, 0, 100) + '%';
+}
+let toastTimer = null;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.add('hidden'), 2400);
+}
+let hintTimer = null;
+function showHint() {
+  clearTimeout(hintTimer);
+  hintEl.classList.remove('hidden');
+  hintTimer = setTimeout(() => hintEl.classList.add('hidden'), 7000);
+}
+function hideAllOverlays() {
+  menuEl.classList.add('hidden');
+  pauseEl.classList.add('hidden');
+  gameoverEl.classList.add('hidden');
+  levelupEl.classList.add('hidden');
+}
+
+// ---------- Game flow ----------
+function startLevel() {
+  const lv = state.level;
+  const ld = generateLevel(lv);
+  state.levelData = ld;
+  state.worldW = ld.worldW;
+  state.worldBottom = Math.max(640, Math.ceil(VIEW.h / state.scale));
+  state.shadows = []; state.ramps = [];
+  state.frozen = []; state.weaveEnergy = 100;
+  state.shardsGot = 0; state.gateActive = false;
+  state.levelStart = performance.now();
+  state.nextAt = 0;
+  state.lastGateHint = 0;
+  const p = state.player;
+  p.x = ld.startX; p.y = FLOOR_Y - PLAYER_H; p.vx = 0; p.vy = 0;
+  p.meter = 100; p.iframes = 1.2;
+  p.grounded = false; p.groundRamp = null; p.groundObj = null;
+  p.lastSafe = { x: p.x, y: p.y };
+  p.trail = []; p.squash = 1; p.jumpBuf = 0; p.coyote = 0;
+  state.lightX = ld.lightStart;
+  state.lightTarget = ld.lightStart;
+  const visW = VIEW.w / state.scale;
+  state.camX = clamp(p.x - visW / 3, 0, Math.max(0, ld.worldW - visW));
+  input.jumpPressed = false; input.jumpHeld = false; input.weavePressed = false;
+  initMotes();
+  state.phase = 'playing';
+  hideAllOverlays();
+  hudEl.classList.remove('hidden');
+  if (isCoarse) touchControlsEl.classList.remove('hidden');
+  updateHUD();
+  toast('LEVEL ' + lv);
+  if (lv === 1) showHint();
+}
+function fullReset() {
+  state.level = 1;
+  state.score = 0;
+  state.totalShards = 0;
+  state.newHigh = -1;
+  state.player.hearts = 3;
+  state.player.meter = 100;
+  state.player.iframes = 1.2;
+  startLevel();
+}
+function startGame() {
+  initAudio();
+  fullReset();
+  sfx.click();
+}
+function restartLevel() {
+  state.player.meter = 100;
+  state.player.iframes = 1.2;
+  startLevel();
+  sfx.click();
+}
+function nextLevel() {
+  state.level += 1;
+  startLevel();
+}
+function pauseGame() {
+  if (state.phase !== 'playing') return;
+  state.phase = 'paused';
+  hideAllOverlays();
+  pauseEl.classList.remove('hidden');
+  touchControlsEl.classList.add('hidden');
+  sfx.click();
+}
+function resumeGame() {
+  if (state.phase !== 'paused') return;
+  input.jumpPressed = false;
+  input.weavePressed = false;
+  state.phase = 'playing';
+  hideAllOverlays();
+  hudEl.classList.remove('hidden');
+  if (isCoarse) touchControlsEl.classList.remove('hidden');
+  sfx.click();
+}
+function quitToMenu() {
+  state.phase = 'menu';
+  state.frozen = [];
+  hideAllOverlays();
+  hudEl.classList.add('hidden');
+  touchControlsEl.classList.add('hidden');
+  menuEl.classList.remove('hidden');
+  renderScores(menuScoresEl, -1);
+  sfx.click();
+}
+function levelComplete() {
+  if (state.phase !== 'playing') return;
+  state.phase = 'levelcomplete';
+  const elapsed = (performance.now() - state.levelStart) / 1000;
+  const timeBonus = Math.max(0, Math.round(200 - elapsed * 4));
+  const bonus = 250 + timeBonus;
+  state.score += bonus;
+  state.totalShards += state.shardsGot;
+  sfx.levelup();
+  shake(10, 0.5);
+  burst(state.player.x, state.player.y + 15, '#ffd76a', 50, { speed: 260, grav: 120 });
+  burst(state.player.x, state.player.y + 15, '#7df9ff', 30, { speed: 180, grav: 120 });
+  luLevelEl.textContent = state.level;
+  luBonusEl.textContent = '+' + bonus;
+  luTimeEl.textContent = '+' + timeBonus;
+  hideAllOverlays();
+  levelupEl.classList.remove('hidden');
+  touchControlsEl.classList.add('hidden');
+  updateHUD();
+  state.nextAt = performance.now() + 1900;
+}
+function gameOver() {
+  state.phase = 'gameover';
+  sfx.gameover();
+  shake(12, 0.6);
+  burst(state.player.x, state.player.y + 15, '#ffd76a', 40, { speed: 240, grav: 160 });
+  state.newHigh = saveScore({ s: state.score, l: state.level, sh: state.totalShards, d: Date.now() });
+  renderScores(finalScoresEl, state.newHigh);
+  renderScores(menuScoresEl, state.newHigh);
+  goScoreEl.textContent = state.score;
+  goLevelEl.textContent = state.level;
+  goShardsEl.textContent = state.totalShards;
+  hideAllOverlays();
+  gameoverEl.classList.remove('hidden');
+  hudEl.classList.add('hidden');
+  touchControlsEl.classList.add('hidden');
+}
+function updateMenuDemo(dt, t) {
+  updateLight(dt, t);
+  computeShadows();
+  updateMotes(dt);
+  updateParticles(dt);
+  const visW = VIEW.w / state.scale;
+  state.camX = (0.5 + 0.5 * Math.sin(t * 0.07)) * Math.max(0, state.worldW - visW);
+  if (Math.random() < dt * 8) {
+    spawnWisp(state.camX + Math.random() * visW, 280 + Math.random() * 280);
+  }
+}
+
+// ---------- Main loop ----------
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.033, Math.max(0.0001, (now - last) / 1000));
+  last = now;
+  const t = now / 1000;
+  if (state.shakeT > 0) { state.shakeT -= dt; if (state.shakeT <= 0) { state.shakeMag = 0; state.shakeDur0 = 1; } }
+  if (state.phase === 'playing') {
+    updateLight(dt, t);
+    computeShadows();
+    updatePlayer(dt);
+    updateWeave(dt);
+    updateShards(dt);
+    updateGate(dt);
+    updateMotes(dt);
+    updateParticles(dt);
+    updatePopups(dt);
+    updateCamera(dt);
+    dissolveFill.style.width = clamp(state.player.meter, 0, 100) + '%';
+    dissolveFill.classList.toggle('danger', !state.player._safe && state.player.iframes <= 0);
+    weaveFill.style.width = clamp(state.weaveEnergy, 0, 100) + '%';
+    weaveFill.classList.toggle('low', state.weaveEnergy < FREEZE_COST);
+  } else if (state.phase === 'menu') {
+    updateMenuDemo(dt, t);
+  } else if (state.phase === 'levelcomplete') {
+    updateParticles(dt);
+    updatePopups(dt);
+    if (now >= state.nextAt) nextLevel();
+  } else if (state.phase === 'gameover' || state.phase === 'paused') {
+    updateParticles(dt);
+  }
+  render(t);
+}
+
+// ---------- Input ----------
+window.addEventListener('keydown', (e) => {
+  initAudio();
+  const code = e.code;
+  if (code === 'ArrowLeft' || code === 'KeyA') { input.left = true; e.preventDefault(); }
+  else if (code === 'ArrowRight' || code === 'KeyD') { input.right = true; e.preventDefault(); }
+  else if (code === 'ArrowUp' || code === 'KeyW' || code === 'Space') {
+    if (!e.repeat) { input.jumpPressed = true; input.jumpHeld = true; }
+    e.preventDefault();
+  }
+  else if (code === 'KeyQ' || code === 'Comma') input.lightL = true;
+  else if (code === 'KeyE' || code === 'Period') input.lightR = true;
+  else if (code === 'KeyS' || code === 'ShiftLeft' || code === 'ShiftRight' || code === 'ArrowDown') {
+    if (!e.repeat && state.phase === 'playing') input.weavePressed = true;
+    e.preventDefault();
+  }
+  else if (code === 'KeyP' || code === 'Escape') {
+    if (state.phase === 'playing') pauseGame();
+    else if (state.phase === 'paused') resumeGame();
+    e.preventDefault();
+  }
+  else if (code === 'KeyR') {
+    if (state.phase === 'gameover') startGame();
+    else if (state.phase === 'paused') restartLevel();
+  }
+  else if (code === 'KeyM') toggleMute();
+  else if (code === 'Enter') {
+    if (state.phase === 'menu' || state.phase === 'gameover') startGame();
+    else if (state.phase === 'levelcomplete') nextLevel();
+  }
+});
+window.addEventListener('keyup', (e) => {
+  const code = e.code;
+  if (code === 'ArrowLeft' || code === 'KeyA') input.left = false;
+  else if (code === 'ArrowRight' || code === 'KeyD') input.right = false;
+  else if (code === 'ArrowUp' || code === 'KeyW' || code === 'Space') input.jumpHeld = false;
+  else if (code === 'KeyQ' || code === 'Comma') input.lightL = false;
+  else if (code === 'KeyE' || code === 'Period') input.lightR = false;
+});
+window.addEventListener('blur', () => {
+  input.left = input.right = input.jumpHeld = input.lightL = input.lightR = false;
+  if (state.phase === 'playing') pauseGame();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state.phase === 'playing') pauseGame();
+});
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('dblclick', (e) => e.preventDefault());
+
+function setLightTargetFromPointer(e) {
+  const rect = canvas.getBoundingClientRect();
+  const wx = (e.clientX - rect.left) / state.scale + state.camX;
+  state.lightTarget = clamp(wx, 10, state.worldW - 10);
+}
+canvas.addEventListener('pointerdown', (e) => {
+  initAudio();
+  if (state.phase !== 'playing') return;
+  e.preventDefault();
+  state.dragging = true;
+  state.hasDragged = true;
+  setLightTargetFromPointer(e);
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  canvas.classList.add('dragging');
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (state.dragging && state.phase === 'playing') setLightTargetFromPointer(e);
+});
+const endDrag = () => { state.dragging = false; canvas.classList.remove('dragging'); };
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+
+function bindHoldButton(el, onDown, onUp) {
+  const down = (e) => { e.preventDefault(); e.stopPropagation(); initAudio(); onDown(); try { el.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } };
+  const up = (e) => { e.preventDefault(); e.stopPropagation(); onUp(); };
+  el.addEventListener('pointerdown', down);
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  el.addEventListener('lostpointercapture', up);
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+bindHoldButton(document.getElementById('btnLeft'), () => { input.left = true; }, () => { input.left = false; });
+bindHoldButton(document.getElementById('btnRight'), () => { input.right = true; }, () => { input.right = false; });
+bindHoldButton(document.getElementById('btnJump'),
+  () => { input.jumpPressed = true; input.jumpHeld = true; },
+  () => { input.jumpHeld = false; });
+bindHoldButton(document.getElementById('btnWeave'),
+  () => { if (state.phase === 'playing') input.weavePressed = true; },
+  () => { /* edge-triggered */ });
+
+// ---------- Buttons ----------
+document.getElementById('btnStart').addEventListener('click', startGame);
+document.getElementById('btnAgain').addEventListener('click', startGame);
+document.getElementById('btnResume').addEventListener('click', resumeGame);
+document.getElementById('btnRestart').addEventListener('click', restartLevel);
+document.getElementById('btnMenu').addEventListener('click', quitToMenu);
+document.getElementById('btnMenu2').addEventListener('click', quitToMenu);
+document.getElementById('btnPause').addEventListener('click', () => {
+  if (state.phase === 'playing') pauseGame();
+  else if (state.phase === 'paused') resumeGame();
+});
+document.getElementById('btnMute').addEventListener('click', toggleMute);
+levelupEl.addEventListener('pointerdown', () => {
+  if (state.phase === 'levelcomplete') nextLevel();
+});
+
+// ---------- Boot ----------
+resize();
+initBg();
+state.levelData = generateLevel(1);
+state.worldW = state.levelData.worldW;
+state.lightX = state.levelData.lightStart;
+state.lightTarget = state.levelData.lightStart;
+initMotes();
+renderScores(menuScoresEl, -1);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
